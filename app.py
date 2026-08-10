@@ -9,7 +9,8 @@ import cv2
 import numpy as np
 from flask import Flask, render_template, request, jsonify, url_for
 
-from pest_model import get_sahi_model, CONF_THRESHOLD, SLICE_SIZE, SLICE_OVERLAP, warm_up
+from pest_model import get_sahi_model, CONF_THRESHOLD, SLICE_SIZE, SLICE_OVERLAP, warm_up as pest_warm_up
+from disease_model import get_disease_pipeline, parse_disease_label, warm_up as disease_warm_up
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
@@ -170,17 +171,48 @@ def detect_pests(image_bgr):
 
 
 def detect_disease(image_bgr):
-    h, w = image_bgr.shape[:2]
-    hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
+    """Real disease diagnosis using a MobileNetV2 classifier fine-tuned on
+    PlantVillage (38 classes). See disease_model.py for where it comes from.
 
+    Note: this is an image classifier, not a segmentation model, so it
+    outputs a single label + confidence for the whole photo -- it doesn't
+    itself know *where* on the leaf the disease is. The color-based overlay
+    below is kept purely as a visual aid for roughly where symptoms appear;
+    the diagnosis, crop, condition, and confidence are all real model output.
+    """
+    h, w = image_bgr.shape[:2]
+
+    from PIL import Image
+    rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+    pil_img = Image.fromarray(rgb)
+
+    pipe = get_disease_pipeline()
+    predictions = pipe(pil_img)  # sorted list of {"label", "score"}
+
+    top = predictions[0]
+    crop, condition, is_healthy = parse_disease_label(top["label"])
+    confidence = round(top["score"] * 100, 1)
+    diagnosis = "Healthy Foliage" if is_healthy else f"{crop} \u2014 {condition}"
+
+    top_predictions = []
+    for p in predictions[:3]:
+        p_crop, p_condition, p_healthy = parse_disease_label(p["label"])
+        label = f"{p_crop} (Healthy)" if p_healthy else f"{p_crop} \u2014 {p_condition}"
+        top_predictions.append({"label": label, "confidence": round(p["score"] * 100, 1)})
+
+    print(f"[disease debug] top prediction: {top['label']} ({confidence}%)")
+
+    # --- Heuristic color-based highlighting: a visual aid only, showing
+    # roughly where discoloration is on the leaf. Not used for the diagnosis
+    # itself -- that came from the real classifier above.
+    hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
     healthy_mask = cv2.inRange(hsv, (35, 40, 40), (90, 255, 255))
-    # brown / yellow / necrotic tissue range
     disease_mask = cv2.inRange(hsv, (8, 40, 40), (34, 255, 230))
-    dark_mask = cv2.inRange(hsv, (0, 0, 0), (180, 255, 55))  # dark necrotic spots
+    dark_mask = cv2.inRange(hsv, (0, 0, 0), (180, 255, 55))
 
     leaf_mask = cv2.bitwise_or(healthy_mask, cv2.bitwise_or(disease_mask, dark_mask))
     combined_disease = cv2.bitwise_or(disease_mask, dark_mask)
-    combined_disease = cv2.bitwise_and(combined_disease, leaf_mask)  # stay within the leaf
+    combined_disease = cv2.bitwise_and(combined_disease, leaf_mask)
 
     kernel = np.ones((5, 5), np.uint8)
     combined_disease = cv2.morphologyEx(combined_disease, cv2.MORPH_OPEN, kernel, iterations=1)
@@ -190,38 +222,43 @@ def detect_disease(image_bgr):
     disease_px = cv2.countNonZero(combined_disease)
     affected_pct = round(100 * disease_px / leaf_px, 1) if leaf_px > 0 else 0.0
 
-    # overlay: blend red over the diseased pixels only
     overlay = image_bgr.copy()
-    red_layer = np.zeros_like(image_bgr)
-    red_layer[:, :] = (40, 40, 235)  # BGR red-ish
-    mask_bool = combined_disease.astype(bool)
-    overlay[mask_bool] = cv2.addWeighted(image_bgr, 0.45, red_layer, 0.55, 0)[mask_bool]
+    contours = []
+    if not is_healthy:
+        red_layer = np.zeros_like(image_bgr)
+        red_layer[:, :] = (40, 40, 235)  # BGR red-ish
+        mask_bool = combined_disease.astype(bool)
+        overlay[mask_bool] = cv2.addWeighted(image_bgr, 0.45, red_layer, 0.55, 0)[mask_bool]
 
-    # outline diseased regions
-    contours, _ = cv2.findContours(combined_disease, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    contours = [c for c in contours if cv2.contourArea(c) > (h * w) * 0.0008]
-    cv2.drawContours(overlay, contours, -1, (40, 40, 235), 2)
-
-    if affected_pct < 3:
-        diagnosis, severity = "Healthy Foliage", "None"
-    elif affected_pct < 12:
-        diagnosis, severity = "Early Blight (suspected)", "Minor"
-    elif affected_pct < 28:
-        diagnosis, severity = "Leaf Spot / Early Blight", "Moderate"
+        contours, _ = cv2.findContours(combined_disease, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = [c for c in contours if cv2.contourArea(c) > (h * w) * 0.0008]
+        cv2.drawContours(overlay, contours, -1, (40, 40, 235), 2)
     else:
-        diagnosis, severity = "Advanced Blight", "Severe"
+        affected_pct = 0.0  # trust the real classifier's healthy call over the color heuristic
 
-    confidence = round(min(98, 70 + affected_pct * 0.6 + random.uniform(0, 5)), 1) if affected_pct >= 3 else round(94 + random.uniform(0, 4), 1)
+    # Severity bucket: gated by the real model's healthy/diseased call, then
+    # graded by how much of the leaf the color heuristic sees as affected.
+    if is_healthy:
+        severity = "None"
+    elif affected_pct < 12:
+        severity = "Minor"
+    elif affected_pct < 28:
+        severity = "Moderate"
+    else:
+        severity = "Severe"
 
     recommendations = {
         "None": "No action needed. Continue routine monitoring.",
         "Minor": "Monitor closely and improve airflow around plants; remove any early affected leaves.",
-        "Moderate": "Remove affected leaves and consider a labeled fungicide treatment. Avoid overhead watering.",
-        "Severe": "Isolate affected plants immediately and treat promptly \u2014 disease is spreading quickly.",
+        "Moderate": "Remove affected leaves and consider a labeled treatment for the diagnosed condition. Avoid overhead watering.",
+        "Severe": "Isolate affected plants promptly and treat \u2014 disease appears to be spreading.",
     }
 
     return {
         "diagnosis": diagnosis,
+        "crop": crop,
+        "condition": condition,
+        "top_predictions": top_predictions,
         "severity": severity,
         "affected_pct": affected_pct,
         "healthy_pct": round(100 - affected_pct, 1),
@@ -339,5 +376,7 @@ def api_soil_history():
 
 if __name__ == "__main__":
     print("Loading pest-detection model (downloads on first run)...")
-    warm_up()
+    pest_warm_up()
+    print("Loading plant-disease model (downloads on first run)...")
+    disease_warm_up()
     app.run(debug=True, port=5001)

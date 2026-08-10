@@ -4,3 +4,5 @@ numpy==1.26.4
 ultralytics
 huggingface_hub
 sahi
+transformers
+pillow
