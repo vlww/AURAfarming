@@ -1,3 +1,10 @@
+/* ==========================================================================
+   AURAfarming — design tokens
+   Palette: pastel green field, warm soil accent, deep leaf-green text.
+   Signature: "leaf-corner" cards (one softened, one sharp corner pairing)
+   and a hand-drawn leaf-vein divider under the page header.
+   ========================================================================== */
+
 @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Mulish:wght@400;500;600;700&display=swap');
 
 :root {
@@ -322,6 +329,11 @@ button, input, select { font-family: inherit; }
 /* ---------- upload dropzone ---------- */
 
 .dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
   border: 2.5px dashed var(--green-300);
   border-radius: var(--radius-leaf);
   background: var(--bg-alt);
