@@ -1,21 +1,3 @@
-"""
-Real pretrained plant-disease classifier.
-
-Uses "linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification" on
-Hugging Face: a MobileNetV2 fine-tuned on the full PlantVillage dataset --
-38 classes covering 14 crop species (healthy + 26 disease types). Reports
-~95.4% eval accuracy and is used in 100+ community Spaces, so it's a
-well-exercised choice, not an obscure one-off.
-
-Model card: https://huggingface.co/linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification
-Dataset:    Hughes & Salathe, PlantVillage, 2015 / Mohanty et al., "Using
-            Deep Learning for Image-Based Plant Disease Detection",
-            Frontiers in Plant Science, 2016.
-
-Loaded via the transformers `pipeline` API. Weights (~14MB) download once
-and are cached by huggingface_hub under ~/.cache/huggingface -- needs
-internet the first time, then loads from cache and works offline.
-"""
 import threading
 
 MODEL_ID = "linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification"
@@ -25,16 +7,18 @@ _pipe_lock = threading.Lock()
 
 
 def get_disease_pipeline():
-    """Lazily load the pretrained plant-disease classification pipeline (thread-safe, loads once)."""
+
     global _pipe
     if _pipe is not None:
         return _pipe
     with _pipe_lock:
         if _pipe is not None:  # re-check inside the lock
             return _pipe
-        from transformers import pipeline
+        from transformers import MobileNetV2ImageProcessor, MobileNetV2ForImageClassification, pipeline
 
-        _pipe = pipeline("image-classification", model=MODEL_ID, top_k=5)
+        processor = MobileNetV2ImageProcessor.from_pretrained(MODEL_ID)
+        model = MobileNetV2ForImageClassification.from_pretrained(MODEL_ID)
+        _pipe = pipeline("image-classification", model=model, image_processor=processor, top_k=5)
     return _pipe
 
 
