@@ -38,7 +38,9 @@ def predict(pil_image, top_k=3):
     id2label = model.config.id2label
     results = []
     for score, idx in zip(top_probs.tolist(), top_idxs.tolist()):
-
+        # id2label keys are ints after HF loads the config, but fall back
+        # to string lookup just in case, so a lookup miss can't silently
+        # turn into a fake "LABEL_N" placeholder again.
         label = id2label.get(idx, id2label.get(str(idx)))
         if label is None:
             label = f"LABEL_{idx}"
@@ -46,16 +48,39 @@ def predict(pil_image, top_k=3):
     return results
 
 
-def parse_disease_label(raw_label):
+# Tried in order, most-specific first. Covers the canonical PlantVillage
+# "Crop___Condition" format as well as looser variants, so a formatting
+# change in the raw label can never make this fall back to "Unknown" --
+# worst case it just doesn't manage to split off a crop name.
+_LABEL_SEPARATORS = ["___", "__", " - ", "-"]
 
-    parts = raw_label.split("___")
-    crop = parts[0].replace("_", " ").strip()
-    condition = parts[1].replace("_", " ").strip() if len(parts) > 1 else "Unknown"
+
+def parse_disease_label(raw_label):
+    """Split a raw model label into (crop, condition, is_healthy).
+
+    Labels are expected to look like 'Tomato___Late_blight' or
+    'Apple___healthy', but this doesn't hard-require that exact separator:
+    it tries a few common variants and, if none match, just treats the
+    whole label as the condition rather than reporting "Unknown".
+    """
+    raw_label = (raw_label or "").strip()
+    crop, condition = "", raw_label
+
+    for sep in _LABEL_SEPARATORS:
+        if sep in raw_label:
+            crop_part, _, condition_part = raw_label.partition(sep)
+            if crop_part.strip() and condition_part.strip():
+                crop, condition = crop_part, condition_part
+                break
+
+    crop = crop.replace("_", " ").strip()
+    condition = condition.replace("_", " ").strip()
     is_healthy = condition.lower() == "healthy"
     return crop, condition, is_healthy
 
 
 def warm_up():
+    """Optional: call at app startup so the first web request isn't slow."""
     try:
         get_disease_model()
         return True
