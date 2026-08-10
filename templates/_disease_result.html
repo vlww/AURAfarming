@@ -1,0 +1,43 @@
+<div class="result-grid" style="margin-top:26px;">
+  <div class="result-image">
+    <img src="{{ result.overlay_image }}" alt="Photo with affected areas highlighted">
+  </div>
+  <div class="card">
+    <span class="badge {{ result.severity|lower }}"><span class="badge-dot"></span>{{ result.diagnosis }}</span>
+    <div style="margin-top:16px;">
+      <div class="big-stat">{{ result.severity }}</div>
+      <div class="big-stat-label">severity &middot; {{ result.confidence }}% confident</div>
+    </div>
+
+    {% if result.crop %}
+    <div class="stat-line" style="margin-top:10px;">
+      <span class="stat-label">Crop</span>
+      <span class="stat-value">{{ result.crop }}</span>
+    </div>
+    {% endif %}
+    <div class="stat-line">
+      <span class="stat-label">Leaf area affected</span>
+      <span class="stat-value">{{ result.affected_pct }}%</span>
+    </div>
+    <div class="stat-line">
+      <span class="stat-label">Scanned at</span>
+      <span class="stat-value">{{ result.time }}</span>
+    </div>
+
+    <div class="recommend-box">
+      <span>🌱</span>
+      <span>{{ result.recommendation }}</span>
+    </div>
+
+    {% if result.top_predictions and result.top_predictions|length > 1 %}
+      <div style="margin-top:16px;">
+        <div class="stat-label" style="margin-bottom:8px;">Other possibilities</div>
+        <div class="species-list">
+          {% for p in result.top_predictions[1:] %}
+            <span class="species-chip">{{ p.label }} &middot; <b>{{ p.confidence }}%</b></span>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>

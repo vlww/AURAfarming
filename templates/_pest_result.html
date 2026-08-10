@@ -1,0 +1,39 @@
+<div class="result-grid" style="margin-top:26px;">
+  <div class="result-image">
+    <img src="{{ result.annotated_image }}" alt="Photo with detected pests marked">
+  </div>
+  <div class="card">
+    <span class="badge {{ result.risk|lower }}"><span class="badge-dot"></span>{{ result.risk }} risk</span>
+    <div style="margin-top:16px;">
+      <div class="big-stat">{{ result.total }}</div>
+      <div class="big-stat-label">pest{{ 's' if result.total != 1 else '' }} detected</div>
+    </div>
+
+    {% if result.species_counts %}
+      <div class="species-list">
+        {% for name, count in result.species_counts.items() %}
+          <span class="species-chip"><b>{{ count }}</b>&nbsp; {{ name }}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="stat-line" style="margin-top:14px;">
+      <span class="stat-label">Leaf coverage in photo</span>
+      <span class="stat-value">{{ result.leaf_coverage_pct }}%</span>
+    </div>
+    <div class="stat-line">
+      <span class="stat-label">Scanned at</span>
+      <span class="stat-value">{{ result.time }}</span>
+    </div>
+
+    <div class="recommend-box">
+      <span>🌿</span>
+      <span>
+        {% if result.risk == 'Low' %}Low pest activity — keep an eye on things during your regular walk-through.
+        {% elif result.risk == 'Moderate' %}Some pest activity found. Check nearby plants and consider targeted treatment.
+        {% else %}High pest activity detected. Inspect the area closely and treat promptly to protect your crop.
+        {% endif %}
+      </span>
+    </div>
+  </div>
+</div>

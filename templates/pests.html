@@ -1,69 +1,43 @@
 {% extends "base.html" %}
-{% block title %}Pest Detection | AURAfarming{% endblock %}
+{% block title %}Pest scan · AURAfarming{% endblock %}
+
 {% block content %}
-<header class="page-header">
-  <h1>Pest Detection</h1>
-  <p>Upload a real crop photo. The image is analyzed with OpenCV to find and classify insect-like shapes (aphids, locusts, caterpillars, beetles) on the actual pixels of your photo.</p>
-</header>
+<div class="page-head">
+  <span class="eyebrow">Pest scan</span>
+  <h1>Check a photo for pests</h1>
+  <p>Upload a clear, close-up photo of your crop. We'll mark anything we find.</p>
+</div>
+<div class="leaf-divider"></div>
 
-<section class="upload-panel">
-  <form id="pestForm">
-    <label class="dropzone" id="pestDropzone">
-      <input type="file" id="pestFile" name="image" accept="image/*" hidden>
-      <span id="pestDropText">Click to choose an image, or drag one here</span>
+<div class="card">
+  <form id="pest-form">
+    <label class="dropzone" id="pest-dropzone" for="pest-file">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      <div class="dropzone-title">Drop a photo here, or tap to choose</div>
+      <div class="dropzone-sub">JPG or PNG, up to 12MB</div>
+      <input type="file" id="pest-file" name="image" accept="image/*">
     </label>
-    <button type="submit" class="btn-primary">Analyze Image</button>
-  </form>
-  <div id="pestStatus" class="status-line"></div>
-</section>
-
-<section class="result-grid" id="pestResults" style="{{ '' if result else 'display:none;' }}">
-  <div class="panel">
-    <div class="panel-title">Annotated Result</div>
-    <img id="pestImage" class="preview" src="{{ result.annotated_image if result else '' }}" alt="">
-  </div>
-  <div class="panel">
-    <div class="panel-title">Detection Summary</div>
-    <div class="stat-row"><span>Total detected</span><strong id="pestTotal">{{ result.total if result }}</strong></div>
-    <div class="stat-row"><span>Risk level</span><strong id="pestRisk">{{ result.risk if result }}</strong></div>
-    <div class="stat-row"><span>Leaf coverage</span><strong id="pestLeafPct">{{ result.leaf_coverage_pct if result }}%</strong></div>
-    <div class="mini-table" id="pestSpeciesTable">
-      {% if result %}
-        {% for species, count in result.species_counts.items() %}
-          <div class="mini-row"><span>{{ species }}</span><span>{{ count }}</span></div>
-        {% endfor %}
-      {% endif %}
+    <div class="preview-wrap" id="pest-preview-wrap">
+      <img id="pest-preview" alt="Selected photo preview">
     </div>
-  </div>
-</section>
+    <div style="display:flex; gap:10px; align-items:center; margin-top:16px;">
+      <button type="submit" class="btn btn-primary" id="pest-submit" disabled>Scan photo</button>
+      <span id="pest-filename" style="color:var(--ink-faint); font-size:0.88rem;"></span>
+    </div>
+    <div class="loading-row" id="pest-loading" style="display:none;">
+      <div class="spinner"></div> Looking for pests…
+    </div>
+    <div class="error-box" id="pest-error" style="display:none;"></div>
+  </form>
+</div>
 
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
-<script>
-  setupUploadPage({
-    formId: "pestForm",
-    fileInputId: "pestFile",
-    dropzoneId: "pestDropzone",
-    dropTextId: "pestDropText",
-    statusId: "pestStatus",
-    resultsId: "pestResults",
-    endpoint: "{{ url_for('api_pests_analyze') }}",
-    onSuccess: (data) => {
-      document.getElementById("pestImage").src = data.annotated_image;
-      document.getElementById("pestTotal").textContent = data.total;
-      document.getElementById("pestRisk").textContent = data.risk;
-      document.getElementById("pestLeafPct").textContent = data.leaf_coverage_pct + "%";
-      const table = document.getElementById("pestSpeciesTable");
-      table.innerHTML = "";
-      Object.entries(data.species_counts).forEach(([species, count]) => {
-        const row = document.createElement("div");
-        row.className = "mini-row";
-        row.innerHTML = `<span>${species}</span><span>${count}</span>`;
-        table.appendChild(row);
-      });
-      if (data.total === 0) {
-        table.innerHTML = '<div class="mini-row"><span>No pests detected</span><span>&#10003;</span></div>';
-      }
-    }
-  });
-</script>
+<div id="pest-results">
+  {% if result %}
+    {% include "_pest_result.html" %}
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pests.js') }}"></script>
 {% endblock %}

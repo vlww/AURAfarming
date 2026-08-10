@@ -1,94 +1,81 @@
 {% extends "base.html" %}
-{% block title %}Dashboard | AURAfarming{% endblock %}
+{% block title %}Overview · AURAfarming{% endblock %}
+
 {% block content %}
-<header class="page-header">
-  <h1>Farm Dashboard</h1>
-  <p>A unified view of pest activity, plant disease, and soil conditions.</p>
-</header>
+<div class="page-head">
+  <span class="eyebrow">Today's field snapshot</span>
+  <h1>Good to see you.</h1>
+  <p>Here's how your crops are doing right now, in plain terms.</p>
+</div>
+<div class="leaf-divider"></div>
 
-<section class="card-grid">
+<div class="card-row">
+
   <div class="card">
-    <div class="card-label">Pest Risk</div>
+    <div class="card-icon tint-green">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="13" rx="4" ry="6"/><path d="M12 7V4M9 5l1.5 2M15 5l-1.5 2M4 10l4 1M20 10l-4 1M4 18l4-2M20 18l-4-2"/></svg>
+    </div>
+    <h3>Pests</h3>
     {% if pest %}
-      <div class="card-value risk-{{ pest.risk|lower }}">{{ pest.risk }}</div>
-      <div class="card-sub">{{ pest.total }} pest{{ 's' if pest.total != 1 else '' }} detected &middot; {{ pest.time }}</div>
+      <span class="badge {{ pest.risk|lower }}"><span class="badge-dot"></span>{{ pest.risk }} risk</span>
+      <p style="margin-top:12px;">Found <strong style="color:var(--green-900);">{{ pest.total }}</strong> pest{{ 's' if pest.total != 1 else '' }} in your last scan.</p>
+      <a class="card-cta" href="{{ url_for('pests_page') }}">View scan &rarr;</a>
     {% else %}
-      <div class="card-value muted">No scan yet</div>
-      <div class="card-sub"><a href="{{ url_for('pests_page') }}">Run a pest scan &rarr;</a></div>
+      <p class="card-empty">No scan yet. Upload a photo of your crop to check for pests.</p>
+      <a class="card-cta" href="{{ url_for('pests_page') }}">Scan for pests &rarr;</a>
     {% endif %}
   </div>
 
   <div class="card">
-    <div class="card-label">Disease Status</div>
+    <div class="card-icon tint-earth">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 4c-6 0-11 5-11 11 0 2.8 2.2 5 5 5 6 0 11-5 11-11 0-1.5-.5-3-1.5-4"/><path d="M9 15c1.5-3 4-5 8-6"/><circle cx="9.5" cy="10.5" r="1"/></svg>
+    </div>
+    <h3>Plant disease</h3>
     {% if disease %}
-      <div class="card-value risk-{{ 'low' if disease.severity == 'None' else ('moderate' if disease.severity in ['Minor','Moderate'] else 'high') }}">{{ disease.diagnosis }}</div>
-      <div class="card-sub">{{ disease.affected_pct }}% affected &middot; {{ disease.time }}</div>
+      <span class="badge {{ disease.severity|lower }}"><span class="badge-dot"></span>{{ disease.diagnosis }}</span>
+      <p style="margin-top:12px;">Severity: <strong style="color:var(--green-900);">{{ disease.severity }}</strong> &middot; {{ disease.affected_pct }}% of leaf affected.</p>
+      <a class="card-cta" href="{{ url_for('disease_page') }}">View scan &rarr;</a>
     {% else %}
-      <div class="card-value muted">No scan yet</div>
-      <div class="card-sub"><a href="{{ url_for('disease_page') }}">Run a disease scan &rarr;</a></div>
+      <p class="card-empty">No scan yet. Upload a leaf photo to check for disease.</p>
+      <a class="card-cta" href="{{ url_for('disease_page') }}">Scan for disease &rarr;</a>
     {% endif %}
   </div>
 
   <div class="card">
-    <div class="card-label">Soil Health Score</div>
+    <div class="card-icon tint-amber">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.5S6 10 6 14.5a6 6 0 0 0 12 0C18 10 12 2.5 12 2.5z"/></svg>
+    </div>
+    <h3>Soil health</h3>
     {% if soil %}
-      <div class="card-value">{{ soil_score }}<span class="unit">/100</span></div>
-      <div class="card-sub">Moisture {{ soil.moisture }}% &middot; pH {{ soil.ph }}</div>
+      <div class="big-stat">{{ soil_score }}<span style="font-size:1.1rem; color:var(--ink-faint);">/100</span></div>
+      <div class="big-stat-label">Moisture {{ soil.moisture }}% &middot; pH {{ soil.ph }}</div>
+      <a class="card-cta" href="{{ url_for('soil_page') }}">View live readings &rarr;</a>
     {% else %}
-      <div class="card-value muted">&ndash;</div>
+      <p class="card-empty">No sensor data yet.</p>
+      <a class="card-cta" href="{{ url_for('soil_page') }}">Open soil monitor &rarr;</a>
     {% endif %}
   </div>
 
-  <div class="card">
-    <div class="card-label">Soil Salinity</div>
-    {% if soil %}
-      <div class="card-value">{{ soil.salinity }}<span class="unit">dS/m</span></div>
-      <div class="card-sub">Nitrogen {{ soil.nitrogen }} ppm &middot; {{ soil.temperature }}&deg;C</div>
-    {% else %}
-      <div class="card-value muted">&ndash;</div>
-    {% endif %}
-  </div>
-</section>
+</div>
 
-<section class="panel-grid">
-  <div class="panel">
-    <div class="panel-title">Latest Pest Scan</div>
-    {% if pest %}
-      <img class="preview" src="{{ pest.annotated_image }}" alt="Annotated pest scan">
-      <div class="mini-table">
-        {% for species, count in pest.species_counts.items() %}
-          <div class="mini-row"><span>{{ species }}</span><span>{{ count }}</span></div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <div class="empty-state">Upload a crop photo on the Pest Detection page to see results here.</div>
-    {% endif %}
-  </div>
-
-  <div class="panel">
-    <div class="panel-title">Latest Disease Scan</div>
-    {% if disease %}
-      <img class="preview" src="{{ disease.overlay_image }}" alt="Disease overlay">
-      <div class="mini-table">
-        <div class="mini-row"><span>Severity</span><span>{{ disease.severity }}</span></div>
-        <div class="mini-row"><span>Confidence</span><span>{{ disease.confidence }}%</span></div>
-      </div>
-    {% else %}
-      <div class="empty-state">Upload a leaf photo on the Disease Detection page to see results here.</div>
-    {% endif %}
-  </div>
-
-  <div class="panel">
-    <div class="panel-title">Soil Trend (last readings)</div>
-    <canvas id="miniSoilChart" height="180"></canvas>
-  </div>
-</section>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
-<script>
-  fetch("{{ url_for('api_soil_history') }}").then(r => r.json()).then(history => {
-    renderMiniSoilChart("miniSoilChart", history);
-  });
-</script>
+<div class="card">
+  <h3 style="margin-bottom:10px;">What to do next</h3>
+  {% set tips = [] %}
+  {% if pest and pest.risk in ['Moderate', 'High'] %}
+    {% set _ = tips.append('Pest pressure is ' + pest.risk|lower + ' — consider a closer inspection of the affected rows.') %}
+  {% endif %}
+  {% if disease and disease.severity not in ['None'] %}
+    {% set _ = tips.append(disease.recommendation) %}
+  {% endif %}
+  {% if soil and soil_score is not none and soil_score < 60 %}
+    {% set _ = tips.append('Soil score is on the low side — check moisture and pH on the Soil monitor page.') %}
+  {% endif %}
+  {% if tips %}
+    <ul style="margin:0; padding-left:20px; color:var(--ink-soft);">
+      {% for tip in tips %}<li style="margin-bottom:6px;">{{ tip }}</li>{% endfor %}
+    </ul>
+  {% else %}
+    <p class="card-empty">Nothing urgent right now. Run a scan on the Pest or Disease pages any time you'd like a check-up.</p>
+  {% endif %}
+</div>
 {% endblock %}

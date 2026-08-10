@@ -1,62 +1,49 @@
 {% extends "base.html" %}
-{% block title %}Soil Monitor | AURAfarming{% endblock %}
+{% block title %}Soil monitor · AURAfarming{% endblock %}
+
 {% block content %}
-<header class="page-header">
-  <h1>Soil Monitor</h1>
-  <p>Live-updating soil sensor readings: moisture, salinity, pH, nitrogen, and temperature.</p>
-</header>
+<div class="page-head">
+  <span class="eyebrow">Soil monitor</span>
+  <h1>Live soil readings</h1>
+  <p>Sensor readings update automatically. No need to refresh the page.</p>
+</div>
+<div class="leaf-divider"></div>
 
-<section class="card-grid">
+<div class="card-row" style="grid-template-columns: 1fr 1.6fr;">
   <div class="card">
-    <div class="card-label">Soil Health Score</div>
-    <div class="card-value" id="scoreValue">&ndash;</div>
+    <h3>Soil health score</h3>
+    <div class="gauge-wrap">
+      <svg width="180" height="180" viewBox="0 0 180 180">
+        <circle cx="90" cy="90" r="76" fill="none" stroke="#DCEFD3" stroke-width="16"/>
+        <circle id="gauge-arc" cx="90" cy="90" r="76" fill="none" stroke="#7FB073" stroke-width="16"
+          stroke-linecap="round" stroke-dasharray="477.5" stroke-dashoffset="477.5"
+          transform="rotate(-90 90 90)"/>
+        <text id="gauge-number" x="90" y="98" text-anchor="middle" font-family="Quicksand, sans-serif" font-weight="700" font-size="38" fill="#2F4A2C">--</text>
+      </svg>
+      <div style="color:var(--ink-faint); font-size:0.85rem; margin-top:6px;">out of 100</div>
+    </div>
   </div>
-  <div class="card">
-    <div class="card-label">Moisture</div>
-    <div class="card-value" id="moistureValue">&ndash;<span class="unit">%</span></div>
-  </div>
-  <div class="card">
-    <div class="card-label">Salinity</div>
-    <div class="card-value" id="salinityValue">&ndash;<span class="unit">dS/m</span></div>
-  </div>
-  <div class="card">
-    <div class="card-label">pH</div>
-    <div class="card-value" id="phValue">&ndash;</div>
-  </div>
-  <div class="card">
-    <div class="card-label">Nitrogen</div>
-    <div class="card-value" id="nitrogenValue">&ndash;<span class="unit">ppm</span></div>
-  </div>
-  <div class="card">
-    <div class="card-label">Temperature</div>
-    <div class="card-value" id="temperatureValue">&ndash;<span class="unit">&deg;C</span></div>
-  </div>
-</section>
 
-<section class="panel-grid two-col">
-  <div class="panel">
-    <div class="panel-title">Moisture &amp; Salinity</div>
-    <canvas id="chartMoistSal" height="220"></canvas>
+  <div class="card">
+    <h3>Current readings</h3>
+    <div class="reading-grid" id="reading-grid">
+      <div class="reading-tile"><span class="stat-label">Moisture</span><span class="stat-value" id="r-moisture">--</span></div>
+      <div class="reading-tile"><span class="stat-label">Salinity</span><span class="stat-value" id="r-salinity">--</span></div>
+      <div class="reading-tile"><span class="stat-label">pH level</span><span class="stat-value" id="r-ph">--</span></div>
+      <div class="reading-tile"><span class="stat-label">Nitrogen</span><span class="stat-value" id="r-nitrogen">--</span></div>
+      <div class="reading-tile"><span class="stat-label">Temperature</span><span class="stat-value" id="r-temperature">--</span></div>
+      <div class="reading-tile"><span class="stat-label">Last updated</span><span class="stat-value" id="r-time">--</span></div>
+    </div>
   </div>
-  <div class="panel">
-    <div class="panel-title">pH &amp; Nitrogen</div>
-    <canvas id="chartPhNitro" height="220"></canvas>
-  </div>
-</section>
+</div>
 
-<section class="panel-grid">
-  <div class="panel">
-    <div class="panel-title">Temperature</div>
-    <canvas id="chartTemp" height="160"></canvas>
-  </div>
-</section>
+<div class="card chart-card">
+  <h3>Moisture &amp; temperature over time</h3>
+  <canvas id="soilChart"></canvas>
+</div>
+{% endblock %}
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
-<script>
-  initSoilPage({
-    historyUrl: "{{ url_for('api_soil_history') }}",
-    latestUrl: "{{ url_for('api_soil_latest') }}"
-  });
-</script>
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/soil.js') }}"></script>
 {% endblock %}

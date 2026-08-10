@@ -188,23 +188,12 @@ def _foreground_mask(image_bgr):
     except cv2.error:
         fg = None
 
-    # If GrabCut fails or collapses to (near) nothing, fall back to the
-    # whole image rather than zeroing out every downstream mask.
     if fg is None or cv2.countNonZero(fg) < 0.03 * h * w:
         fg = np.full((h, w), 255, np.uint8)
     return fg
 
 
 def detect_disease(image_bgr):
-    """Real disease diagnosis using a MobileNetV2 classifier fine-tuned on
-    PlantVillage (38 classes). See disease_model.py for where it comes from.
-
-    Note: this is an image classifier, not a segmentation model, so it
-    outputs a single label + confidence for the whole photo -- it doesn't
-    itself know *where* on the leaf the disease is. The color-based overlay
-    below is kept purely as a visual aid for roughly where symptoms appear;
-    the diagnosis, crop, condition, and confidence are all real model output.
-    """
     h, w = image_bgr.shape[:2]
 
     from PIL import Image
@@ -287,7 +276,7 @@ def detect_disease(image_bgr):
         "None": "No action needed. Continue routine monitoring.",
         "Minor": "Monitor closely and improve airflow around plants; remove any early affected leaves.",
         "Moderate": "Remove affected leaves and consider a labeled treatment for the diagnosed condition. Avoid overhead watering.",
-        "Severe": "Isolate affected plants promptly and treat \u2014 disease appears to be spreading.",
+        "Severe": "Isolate affected plants promptly and treat. Disease appears to be spreading.",
     }
 
     return {
@@ -336,12 +325,13 @@ def dashboard():
         disease=STATE["last_disease"],
         soil=latest_soil,
         soil_score=soil_score,
+        active_page="dashboard",
     )
 
 
 @app.route("/pests")
 def pests_page():
-    return render_template("pests.html", result=STATE["last_pest"])
+    return render_template("pests.html", result=STATE["last_pest"], active_page="pests")
 
 
 @app.route("/api/pests/analyze", methods=["POST"])
@@ -368,7 +358,7 @@ def api_pests_analyze():
 
 @app.route("/disease")
 def disease_page():
-    return render_template("disease.html", result=STATE["last_disease"])
+    return render_template("disease.html", result=STATE["last_disease"], active_page="disease")
 
 
 @app.route("/api/disease/analyze", methods=["POST"])
@@ -395,7 +385,7 @@ def api_disease_analyze():
 
 @app.route("/soil")
 def soil_page():
-    return render_template("soil.html")
+    return render_template("soil.html", active_page="soil")
 
 
 @app.route("/api/soil/latest")
