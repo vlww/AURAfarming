@@ -101,10 +101,6 @@ def detect_pests(image_bgr):
     sahi_model = get_sahi_model()
     from sahi.predict import get_sliced_prediction
 
-    # Slices the image into overlapping tiles, runs the detector on each tile
-    # near-full-resolution, then merges results -- this is what catches small
-    # or tightly clustered pests (e.g. an aphid colony) that a single
-    # full-frame pass tends to miss or blur together.
     sliced = get_sliced_prediction(
         work_img[:, :, ::-1],  # SAHI expects RGB, we have BGR from cv2
         sahi_model,
@@ -130,8 +126,6 @@ def detect_pests(image_bgr):
         species = pred.category.name.replace("_", " ").title()
         confidence = round(conf_val * 100, 1)
 
-        # box coords are in work_img (possibly upscaled) space -- map back
-        # to the original image's coordinates before returning/drawing.
         bx1, by1, bx2, by2 = pred.bbox.minx, pred.bbox.miny, pred.bbox.maxx, pred.bbox.maxy
         x1, y1, x2, y2 = (int(v / scale) for v in (bx1, by1, bx2, by2))
         x1, y1 = max(0, x1), max(0, y1)
@@ -171,11 +165,6 @@ def detect_pests(image_bgr):
 
 
 def _foreground_mask(image_bgr):
-    """Rough foreground/background separation via GrabCut, so the color
-    heuristic below only looks for spots on the plant itself and ignores
-    background clutter. Assumes the subject is roughly centered, which
-    holds for typical close-up leaf photos.
-    """
     h, w = image_bgr.shape[:2]
     mask = np.zeros((h, w), np.uint8)
     bgd_model = np.zeros((1, 65), np.float64)
@@ -215,18 +204,6 @@ def detect_disease(image_bgr):
 
     print(f"[disease debug] top prediction: {top['label']} ({confidence}%)")
 
-    # --- Heuristic color-based highlighting: a visual aid only, showing
-    # roughly where discoloration is on the leaf. Not used for the diagnosis
-    # itself -- that came from the real classifier above.
-    #
-    # Simplest possible color rule: healthy foliage is green, so anything
-    # inside the leaf's silhouette that ISN'T green (browns, yellows, black
-    # spots, rust, etc.) gets flagged as a possible symptom. Restricted to
-    # the GrabCut foreground mask so background clutter doesn't get flagged
-    # -- EXCEPT for very dark spots: GrabCut has no color info to work with
-    # on near-black blobs and tends to call them background, which is what
-    # was causing dark spots to sometimes get missed. So dark pixels are
-    # checked across the whole photo, not just inside the foreground mask.
     fg_mask = _foreground_mask(image_bgr)
 
     hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
@@ -240,8 +217,6 @@ def detect_disease(image_bgr):
     non_green = cv2.morphologyEx(non_green, cv2.MORPH_OPEN, kernel, iterations=1)
     non_green = cv2.morphologyEx(non_green, cv2.MORPH_CLOSE, kernel, iterations=2)
 
-    # Dark spots can fall outside fg_mask, so widen the leaf-area
-    # denominator to match, or affected_pct could read over 100%.
     leaf_mask = cv2.bitwise_or(fg_mask, dark_mask)
     leaf_px = cv2.countNonZero(leaf_mask)
     disease_px = cv2.countNonZero(non_green)
@@ -261,8 +236,6 @@ def detect_disease(image_bgr):
     else:
         affected_pct = 0.0  # trust the real classifier's healthy call over the color heuristic
 
-    # Severity bucket: gated by the real model's healthy/diseased call, then
-    # graded by how much of the leaf the color heuristic sees as affected.
     if is_healthy:
         severity = "None"
     elif affected_pct < 12:

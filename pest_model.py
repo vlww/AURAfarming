@@ -25,7 +25,6 @@ _model_lock = threading.Lock()
 
 
 def _download_weights():
-    """Download (or reuse cached) model weights from the Hugging Face Hub."""
     from huggingface_hub import hf_hub_download
 
     return hf_hub_download(
@@ -36,7 +35,6 @@ def _download_weights():
 
 
 def get_model():
-    """Lazily load the plain pretrained YOLO pest-detection model (thread-safe, loads once)."""
     global _model
     if _model is not None:
         return _model
@@ -51,13 +49,6 @@ def get_model():
 
 
 def get_sahi_model():
-    """Lazily load the same weights wrapped for SAHI slicing-aided inference.
-
-    Use this instead of get_model() for photos that may contain small or
-    clustered pests (e.g. aphid colonies) -- it tiles the image, runs
-    detection per tile, and merges results, which catches things a single
-    full-frame pass misses.
-    """
     global _sahi_model
     if _sahi_model is not None:
         return _sahi_model
@@ -77,7 +68,6 @@ def get_sahi_model():
 
 
 def warm_up():
-    """Optional: call at app startup so the first web request isn't slow."""
     try:
         get_model()
         get_sahi_model()
