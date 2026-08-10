@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Soil Monitor | AURAfarming{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1>Soil Monitor</h1>
+  <p>Live-updating soil sensor readings: moisture, salinity, pH, nitrogen, and temperature.</p>
+</header>
+
+<section class="card-grid">
+  <div class="card">
+    <div class="card-label">Soil Health Score</div>
+    <div class="card-value" id="scoreValue">&ndash;</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Moisture</div>
+    <div class="card-value" id="moistureValue">&ndash;<span class="unit">%</span></div>
+  </div>
+  <div class="card">
+    <div class="card-label">Salinity</div>
+    <div class="card-value" id="salinityValue">&ndash;<span class="unit">dS/m</span></div>
+  </div>
+  <div class="card">
+    <div class="card-label">pH</div>
+    <div class="card-value" id="phValue">&ndash;</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Nitrogen</div>
+    <div class="card-value" id="nitrogenValue">&ndash;<span class="unit">ppm</span></div>
+  </div>
+  <div class="card">
+    <div class="card-label">Temperature</div>
+    <div class="card-value" id="temperatureValue">&ndash;<span class="unit">&deg;C</span></div>
+  </div>
+</section>
+
+<section class="panel-grid two-col">
+  <div class="panel">
+    <div class="panel-title">Moisture &amp; Salinity</div>
+    <canvas id="chartMoistSal" height="220"></canvas>
+  </div>
+  <div class="panel">
+    <div class="panel-title">pH &amp; Nitrogen</div>
+    <canvas id="chartPhNitro" height="220"></canvas>
+  </div>
+</section>
+
+<section class="panel-grid">
+  <div class="panel">
+    <div class="panel-title">Temperature</div>
+    <canvas id="chartTemp" height="160"></canvas>
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+  initSoilPage({
+    historyUrl: "{{ url_for('api_soil_history') }}",
+    latestUrl: "{{ url_for('api_soil_latest') }}"
+  });
+</script>
+{% endblock %}

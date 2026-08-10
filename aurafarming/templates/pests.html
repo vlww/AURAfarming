@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Pest Detection | AURAfarming{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1>Pest Detection</h1>
+  <p>Upload a real crop photo. The image is analyzed with OpenCV to find and classify insect-like shapes (aphids, locusts, caterpillars, beetles) on the actual pixels of your photo.</p>
+</header>
+
+<section class="upload-panel">
+  <form id="pestForm">
+    <label class="dropzone" id="pestDropzone">
+      <input type="file" id="pestFile" name="image" accept="image/*" hidden>
+      <span id="pestDropText">Click to choose an image, or drag one here</span>
+    </label>
+    <button type="submit" class="btn-primary">Analyze Image</button>
+  </form>
+  <div id="pestStatus" class="status-line"></div>
+</section>
+
+<section class="result-grid" id="pestResults" style="{{ '' if result else 'display:none;' }}">
+  <div class="panel">
+    <div class="panel-title">Annotated Result</div>
+    <img id="pestImage" class="preview" src="{{ result.annotated_image if result else '' }}" alt="">
+  </div>
+  <div class="panel">
+    <div class="panel-title">Detection Summary</div>
+    <div class="stat-row"><span>Total detected</span><strong id="pestTotal">{{ result.total if result }}</strong></div>
+    <div class="stat-row"><span>Risk level</span><strong id="pestRisk">{{ result.risk if result }}</strong></div>
+    <div class="stat-row"><span>Leaf coverage</span><strong id="pestLeafPct">{{ result.leaf_coverage_pct if result }}%</strong></div>
+    <div class="mini-table" id="pestSpeciesTable">
+      {% if result %}
+        {% for species, count in result.species_counts.items() %}
+          <div class="mini-row"><span>{{ species }}</span><span>{{ count }}</span></div>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+  setupUploadPage({
+    formId: "pestForm",
+    fileInputId: "pestFile",
+    dropzoneId: "pestDropzone",
+    dropTextId: "pestDropText",
+    statusId: "pestStatus",
+    resultsId: "pestResults",
+    endpoint: "{{ url_for('api_pests_analyze') }}",
+    onSuccess: (data) => {
+      document.getElementById("pestImage").src = data.annotated_image;
+      document.getElementById("pestTotal").textContent = data.total;
+      document.getElementById("pestRisk").textContent = data.risk;
+      document.getElementById("pestLeafPct").textContent = data.leaf_coverage_pct + "%";
+      const table = document.getElementById("pestSpeciesTable");
+      table.innerHTML = "";
+      Object.entries(data.species_counts).forEach(([species, count]) => {
+        const row = document.createElement("div");
+        row.className = "mini-row";
+        row.innerHTML = `<span>${species}</span><span>${count}</span>`;
+        table.appendChild(row);
+      });
+      if (data.total === 0) {
+        table.innerHTML = '<div class="mini-row"><span>No pests detected</span><span>&#10003;</span></div>';
+      }
+    }
+  });
+</script>
+{% endblock %}

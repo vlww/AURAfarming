@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}AURAfarming{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="layout">
+    <nav class="sidebar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <div>
+          <div class="brand-name">AURAfarming</div>
+          <div class="brand-sub">Smart Farm Monitor</div>
+        </div>
+      </div>
+      <a class="nav-link {{ 'active' if request.path == url_for('dashboard') else '' }}" href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a class="nav-link {{ 'active' if request.path == url_for('pests_page') else '' }}" href="{{ url_for('pests_page') }}">Pest Detection</a>
+      <a class="nav-link {{ 'active' if request.path == url_for('disease_page') else '' }}" href="{{ url_for('disease_page') }}">Disease Detection</a>
+      <a class="nav-link {{ 'active' if request.path == url_for('soil_page') else '' }}" href="{{ url_for('soil_page') }}">Soil Monitor</a>
+      <div class="sidebar-footer">
+        <span class="status-dot"></span> System online
+      </div>
+    </nav>
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

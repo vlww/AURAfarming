@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Disease Detection | AURAfarming{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1>Plant Disease Detection</h1>
+  <p>Upload a real leaf photo. The image is analyzed with OpenCV color segmentation to separate healthy green tissue from diseased (brown/yellow/necrotic) tissue on the actual pixels of your photo.</p>
+</header>
+
+<section class="upload-panel">
+  <form id="diseaseForm">
+    <label class="dropzone" id="diseaseDropzone">
+      <input type="file" id="diseaseFile" name="image" accept="image/*" hidden>
+      <span id="diseaseDropText">Click to choose an image, or drag one here</span>
+    </label>
+    <button type="submit" class="btn-primary">Analyze Image</button>
+  </form>
+  <div id="diseaseStatus" class="status-line"></div>
+</section>
+
+<section class="result-grid" id="diseaseResults" style="{{ '' if result else 'display:none;' }}">
+  <div class="panel">
+    <div class="panel-title">Affected-Area Overlay</div>
+    <img id="diseaseImage" class="preview" src="{{ result.overlay_image if result else '' }}" alt="">
+  </div>
+  <div class="panel">
+    <div class="panel-title">Diagnosis</div>
+    <div class="stat-row"><span>Diagnosis</span><strong id="diseaseDiagnosis">{{ result.diagnosis if result }}</strong></div>
+    <div class="stat-row"><span>Severity</span><strong id="diseaseSeverity">{{ result.severity if result }}</strong></div>
+    <div class="stat-row"><span>Confidence</span><strong id="diseaseConfidence">{{ result.confidence if result }}%</strong></div>
+    <div class="bar-wrap">
+      <div class="bar-label"><span>Healthy tissue</span><span id="healthyPct">{{ result.healthy_pct if result }}%</span></div>
+      <div class="bar-track"><div class="bar-fill healthy" id="healthyBar" style="width:{{ result.healthy_pct if result else 0 }}%"></div></div>
+      <div class="bar-label"><span>Affected tissue</span><span id="affectedPct">{{ result.affected_pct if result }}%</span></div>
+      <div class="bar-track"><div class="bar-fill affected" id="affectedBar" style="width:{{ result.affected_pct if result else 0 }}%"></div></div>
+    </div>
+    <div class="recommendation" id="diseaseRecommendation">{{ result.recommendation if result }}</div>
+  </div>
+</section>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+  setupUploadPage({
+    formId: "diseaseForm",
+    fileInputId: "diseaseFile",
+    dropzoneId: "diseaseDropzone",
+    dropTextId: "diseaseDropText",
+    statusId: "diseaseStatus",
+    resultsId: "diseaseResults",
+    endpoint: "{{ url_for('api_disease_analyze') }}",
+    onSuccess: (data) => {
+      document.getElementById("diseaseImage").src = data.overlay_image;
+      document.getElementById("diseaseDiagnosis").textContent = data.diagnosis;
+      document.getElementById("diseaseSeverity").textContent = data.severity;
+      document.getElementById("diseaseConfidence").textContent = data.confidence + "%";
+      document.getElementById("healthyPct").textContent = data.healthy_pct + "%";
+      document.getElementById("affectedPct").textContent = data.affected_pct + "%";
+      document.getElementById("healthyBar").style.width = data.healthy_pct + "%";
+      document.getElementById("affectedBar").style.width = data.affected_pct + "%";
+      document.getElementById("diseaseRecommendation").textContent = data.recommendation;
+    }
+  });
+</script>
+{% endblock %}
