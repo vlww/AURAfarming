@@ -78,11 +78,14 @@ def _soil_score(reading):
     return max(0, min(100, round(score)))
 
 
+# seed a bit of history so the dashboard isn't empty on first load
 for _ in range(20):
     _next_soil_reading()
 
 
 def detect_pests(image_bgr):
+    """Real pest detection using a YOLO11 model fine-tuned on IP102 (102 pest
+    species). See pest_model.py for where the weights come from."""
     h, w = image_bgr.shape[:2]
     img_area = h * w
 
@@ -98,6 +101,10 @@ def detect_pests(image_bgr):
     sahi_model = get_sahi_model()
     from sahi.predict import get_sliced_prediction
 
+    # Slices the image into overlapping tiles, runs the detector on each tile
+    # near-full-resolution, then merges results -- this is what catches small
+    # or tightly clustered pests (e.g. an aphid colony) that a single
+    # full-frame pass tends to miss or blur together.
     sliced = get_sliced_prediction(
         work_img[:, :, ::-1],  # SAHI expects RGB, we have BGR from cv2
         sahi_model,
@@ -164,6 +171,11 @@ def detect_pests(image_bgr):
 
 
 def _foreground_mask(image_bgr):
+    """Rough foreground/background separation via GrabCut, so the color
+    heuristic below only looks for spots on the plant itself and ignores
+    background clutter. Assumes the subject is roughly centered, which
+    holds for typical close-up leaf photos.
+    """
     h, w = image_bgr.shape[:2]
     mask = np.zeros((h, w), np.uint8)
     bgd_model = np.zeros((1, 65), np.float64)
@@ -230,7 +242,7 @@ def detect_disease(image_bgr):
 
     hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
     green_mask = cv2.inRange(hsv, (30, 40, 40), (95, 255, 255))
-    dark_mask = cv2.inRange(hsv, (0, 0, 0), (180, 255, 60))  # near-black, any hue/saturation
+    dark_mask = cv2.inRange(hsv, (0, 0, 0), (180, 255, 40))  # near-black, any hue/saturation
 
     non_green = cv2.bitwise_and(fg_mask, cv2.bitwise_not(green_mask))
     non_green = cv2.bitwise_or(non_green, dark_mask)
