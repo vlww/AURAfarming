@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 from flask import Flask, render_template, request, jsonify, url_for
 
-from pest_model import get_model, CONF_THRESHOLD, IMG_SIZE, warm_up
+from pest_model import get_sahi_model, CONF_THRESHOLD, SLICE_SIZE, SLICE_OVERLAP, warm_up
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
@@ -88,31 +88,51 @@ def detect_pests(image_bgr):
     h, w = image_bgr.shape[:2]
     img_area = h * w
 
-    model = get_model()
-    # Run at a very low internal threshold (0.01) so we can see EVERYTHING the
-    # model is considering, then filter to CONF_THRESHOLD ourselves below.
-    # This makes it possible to tell "model saw it but wasn't confident"
-    # (tune CONF_THRESHOLD down) apart from "model genuinely saw nothing"
-    # (likely a domain-gap / image issue, not a threshold issue).
-    raw = model.predict(image_bgr, conf=0.01, imgsz=IMG_SIZE, verbose=False)[0]
-    class_names = raw.names
+    # Upscale small photos so tiny/clustered pests have more pixels to work
+    # with -- a 400px-wide photo shrinks aphids to near-nothing once tiled.
+    work_img = image_bgr
+    scale = 1.0
+    max_dim = max(h, w)
+    if max_dim < 900:
+        scale = 900 / max_dim
+        work_img = cv2.resize(image_bgr, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC)
 
-    all_confidences = sorted((float(b.conf[0]) for b in raw.boxes), reverse=True)
+    sahi_model = get_sahi_model()
+    from sahi.predict import get_sliced_prediction
+
+    # Slices the image into overlapping tiles, runs the detector on each tile
+    # near-full-resolution, then merges results -- this is what catches small
+    # or tightly clustered pests (e.g. an aphid colony) that a single
+    # full-frame pass tends to miss or blur together.
+    sliced = get_sliced_prediction(
+        work_img[:, :, ::-1],  # SAHI expects RGB, we have BGR from cv2
+        sahi_model,
+        slice_height=SLICE_SIZE,
+        slice_width=SLICE_SIZE,
+        overlap_height_ratio=SLICE_OVERLAP,
+        overlap_width_ratio=SLICE_OVERLAP,
+        verbose=0,
+    )
+
+    all_confidences = sorted((p.score.value for p in sliced.object_prediction_list), reverse=True)
     print(f"[pest debug] raw candidate boxes: {len(all_confidences)}, "
           f"top confidences: {[round(c, 2) for c in all_confidences[:8]]}, "
-          f"threshold in use: {CONF_THRESHOLD}")
+          f"threshold in use: {CONF_THRESHOLD}, upscale factor: {round(scale, 2)}")
 
     detections = []
     annotated = image_bgr.copy()
 
-    for box in raw.boxes:
-        conf_val = float(box.conf[0])
+    for pred in sliced.object_prediction_list:
+        conf_val = pred.score.value
         if conf_val < CONF_THRESHOLD:
             continue
-        cls_id = int(box.cls[0])
-        species = class_names.get(cls_id, f"class_{cls_id}").replace("_", " ").title()
+        species = pred.category.name.replace("_", " ").title()
         confidence = round(conf_val * 100, 1)
-        x1, y1, x2, y2 = (int(v) for v in box.xyxy[0].tolist())
+
+        # box coords are in work_img (possibly upscaled) space -- map back
+        # to the original image's coordinates before returning/drawing.
+        bx1, by1, bx2, by2 = pred.bbox.minx, pred.bbox.miny, pred.bbox.maxx, pred.bbox.maxy
+        x1, y1, x2, y2 = (int(v / scale) for v in (bx1, by1, bx2, by2))
         x1, y1 = max(0, x1), max(0, y1)
         bw, bh = x2 - x1, y2 - y1
 
