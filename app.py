@@ -10,7 +10,7 @@ import numpy as np
 from flask import Flask, render_template, request, jsonify, url_for
 
 from pest_model import get_sahi_model, CONF_THRESHOLD, SLICE_SIZE, SLICE_OVERLAP, warm_up as pest_warm_up
-from disease_model import get_disease_pipeline, parse_disease_label, warm_up as disease_warm_up
+from disease_model import predict as disease_predict, parse_disease_label, warm_up as disease_warm_up
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
@@ -170,6 +170,31 @@ def detect_pests(image_bgr):
     }, annotated
 
 
+def _foreground_mask(image_bgr):
+    """Rough foreground/background separation via GrabCut, so the color
+    heuristic below only looks for spots on the plant itself and ignores
+    background clutter. Assumes the subject is roughly centered, which
+    holds for typical close-up leaf photos.
+    """
+    h, w = image_bgr.shape[:2]
+    mask = np.zeros((h, w), np.uint8)
+    bgd_model = np.zeros((1, 65), np.float64)
+    fgd_model = np.zeros((1, 65), np.float64)
+    margin_x, margin_y = int(w * 0.06), int(h * 0.06)
+    rect = (margin_x, margin_y, w - 2 * margin_x, h - 2 * margin_y)
+    try:
+        cv2.grabCut(image_bgr, mask, rect, bgd_model, fgd_model, 5, cv2.GC_INIT_WITH_RECT)
+        fg = np.where((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
+    except cv2.error:
+        fg = None
+
+    # If GrabCut fails or collapses to (near) nothing, fall back to the
+    # whole image rather than zeroing out every downstream mask.
+    if fg is None or cv2.countNonZero(fg) < 0.03 * h * w:
+        fg = np.full((h, w), 255, np.uint8)
+    return fg
+
+
 def detect_disease(image_bgr):
     """Real disease diagnosis using a MobileNetV2 classifier fine-tuned on
     PlantVillage (38 classes). See disease_model.py for where it comes from.
@@ -186,40 +211,41 @@ def detect_disease(image_bgr):
     rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     pil_img = Image.fromarray(rgb)
 
-    pipe = get_disease_pipeline()
-    predictions = pipe(pil_img)  # sorted list of {"label", "score"}
+    predictions = disease_predict(pil_img, top_k=3)  # sorted list of {"label", "score"}
 
     top = predictions[0]
     crop, condition, is_healthy = parse_disease_label(top["label"])
     confidence = round(top["score"] * 100, 1)
-    diagnosis = "Healthy Foliage" if is_healthy else f"{crop} \u2014 {condition}"
+    diagnosis = "Healthy" if is_healthy else condition.title()
 
     top_predictions = []
     for p in predictions[:3]:
         p_crop, p_condition, p_healthy = parse_disease_label(p["label"])
-        label = f"{p_crop} (Healthy)" if p_healthy else f"{p_crop} \u2014 {p_condition}"
-        top_predictions.append({"label": label, "confidence": round(p["score"] * 100, 1)})
+        label = "Healthy" if p_healthy else p_condition.title()
+        top_predictions.append({"label": label, "crop": p_crop, "confidence": round(p["score"] * 100, 1)})
 
     print(f"[disease debug] top prediction: {top['label']} ({confidence}%)")
 
     # --- Heuristic color-based highlighting: a visual aid only, showing
     # roughly where discoloration is on the leaf. Not used for the diagnosis
-    # itself -- that came from the real classifier above.
-    hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
-    healthy_mask = cv2.inRange(hsv, (35, 40, 40), (90, 255, 255))
-    disease_mask = cv2.inRange(hsv, (8, 40, 40), (34, 255, 230))
-    dark_mask = cv2.inRange(hsv, (0, 0, 0), (180, 255, 55))
+    # itself -- that came from the real classifier above. Restricted to the
+    # GrabCut foreground mask so background clutter doesn't get flagged.
+    #
+    # Simplest possible color rule: healthy foliage is green, so anything
+    # inside the leaf's silhouette that ISN'T green (browns, yellows, black
+    # spots, rust, etc.) gets flagged as a possible symptom.
+    fg_mask = _foreground_mask(image_bgr)
 
-    leaf_mask = cv2.bitwise_or(healthy_mask, cv2.bitwise_or(disease_mask, dark_mask))
-    combined_disease = cv2.bitwise_or(disease_mask, dark_mask)
-    combined_disease = cv2.bitwise_and(combined_disease, leaf_mask)
+    hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
+    green_mask = cv2.inRange(hsv, (30, 40, 40), (95, 255, 255))
+    non_green = cv2.bitwise_and(fg_mask, cv2.bitwise_not(green_mask))
 
     kernel = np.ones((5, 5), np.uint8)
-    combined_disease = cv2.morphologyEx(combined_disease, cv2.MORPH_OPEN, kernel, iterations=1)
-    combined_disease = cv2.morphologyEx(combined_disease, cv2.MORPH_CLOSE, kernel, iterations=2)
+    non_green = cv2.morphologyEx(non_green, cv2.MORPH_OPEN, kernel, iterations=1)
+    non_green = cv2.morphologyEx(non_green, cv2.MORPH_CLOSE, kernel, iterations=2)
 
-    leaf_px = cv2.countNonZero(leaf_mask)
-    disease_px = cv2.countNonZero(combined_disease)
+    leaf_px = cv2.countNonZero(fg_mask)
+    disease_px = cv2.countNonZero(non_green)
     affected_pct = round(100 * disease_px / leaf_px, 1) if leaf_px > 0 else 0.0
 
     overlay = image_bgr.copy()
@@ -227,10 +253,10 @@ def detect_disease(image_bgr):
     if not is_healthy:
         red_layer = np.zeros_like(image_bgr)
         red_layer[:, :] = (40, 40, 235)  # BGR red-ish
-        mask_bool = combined_disease.astype(bool)
+        mask_bool = non_green.astype(bool)
         overlay[mask_bool] = cv2.addWeighted(image_bgr, 0.45, red_layer, 0.55, 0)[mask_bool]
 
-        contours, _ = cv2.findContours(combined_disease, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(non_green, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = [c for c in contours if cv2.contourArea(c) > (h * w) * 0.0008]
         cv2.drawContours(overlay, contours, -1, (40, 40, 235), 2)
     else:
