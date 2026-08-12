@@ -55,15 +55,9 @@
           <img src="${r.overlay_image}" alt="Photo with affected areas highlighted">
         </div>
         <div class="card">
-          <div style="margin-top:0;">
-            <div class="big-stat">${r.severity}</div>
-            <div class="big-stat-label">severity &middot; ${r.confidence}% confident</div>
-          </div>
-          <div class="diagnosis-highlight ${r.severity !== 'None' ? 'concern' : 'clear'}">
-            <span class="diagnosis-label">Diagnosis</span>
-            <span class="diagnosis-value">${r.diagnosis}</span>
-          </div>
-          <div class="stat-line">
+          <div class="diagnosis-headline ${r.severity !== 'None' ? 'concern' : 'clear'}">${r.diagnosis}</div>
+          <div class="diagnosis-subline">${r.severity} <span class="sep">|</span> ${r.confidence}% Confident</div>
+          <div class="stat-line" style="margin-top:14px;">
             <span class="stat-label">Leaf area affected</span>
             <span class="stat-value">${r.affected_pct}%</span>
           </div>

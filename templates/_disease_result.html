@@ -3,17 +3,10 @@
     <img src="{{ result.overlay_image }}" alt="Photo with affected areas highlighted">
   </div>
   <div class="card">
-    <div style="margin-top:0;">
-      <div class="big-stat">{{ result.severity }}</div>
-      <div class="big-stat-label">severity &middot; {{ result.confidence }}% confident</div>
-    </div>
+    <div class="diagnosis-headline {{ 'concern' if result.severity != 'None' else 'clear' }}">{{ result.diagnosis }}</div>
+    <div class="diagnosis-subline">{{ result.severity }} <span class="sep">|</span> {{ result.confidence }}% Confident</div>
 
-    <div class="diagnosis-highlight {{ 'concern' if result.severity != 'None' else 'clear' }}">
-      <span class="diagnosis-label">Diagnosis</span>
-      <span class="diagnosis-value">{{ result.diagnosis }}</span>
-    </div>
-
-    <div class="stat-line">
+    <div class="stat-line" style="margin-top:14px;">
       <span class="stat-label">Leaf area affected</span>
       <span class="stat-value">{{ result.affected_pct }}%</span>
     </div>

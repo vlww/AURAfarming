@@ -279,32 +279,29 @@ button, input, select { font-family: inherit; }
 .badge.moderate, .badge.minor { background: var(--amber-100); color: #96660E; }
 .badge.high, .badge.severe { background: var(--rust-100); color: var(--rust-500); }
 
-.diagnosis-highlight {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 18px;
-  border-radius: var(--radius-leaf-sm);
-  margin: 14px 0 4px;
-}
-
-.diagnosis-highlight .diagnosis-label {
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 0.85;
-}
-
-.diagnosis-highlight .diagnosis-value {
+.diagnosis-headline {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: 1.6rem;
+  line-height: 1.2;
+  color: var(--green-900);
 }
 
-.diagnosis-highlight.concern { background: var(--rust-100); color: var(--rust-500); }
-.diagnosis-highlight.clear { background: var(--leaf-good-bg); color: var(--leaf-good); }
+.diagnosis-headline.concern { color: var(--rust-500); }
+.diagnosis-headline.clear { color: var(--leaf-good); }
+
+.diagnosis-subline {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+
+.diagnosis-subline .sep {
+  color: var(--ink-faint);
+  margin: 0 2px;
+  font-weight: 400;
+}
 
 .badge-dot {
   width: 7px; height: 7px; border-radius: 50%;
