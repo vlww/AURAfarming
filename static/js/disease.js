@@ -44,8 +44,6 @@
     }
   });
 
-  function badgeClass(severity) { return (severity || '').toLowerCase(); }
-
   function renderResult(r) {
     const others = (r.top_predictions || []).slice(1)
       .map((p) => `<span class="species-chip">${p.label} &middot; <b>${p.confidence}%</b></span>`)
@@ -57,8 +55,7 @@
           <img src="${r.overlay_image}" alt="Photo with affected areas highlighted">
         </div>
         <div class="card">
-          <span class="badge ${badgeClass(r.severity)}"><span class="badge-dot"></span>${r.diagnosis}</span>
-          <div style="margin-top:16px;">
+          <div style="margin-top:0;">
             <div class="big-stat">${r.severity}</div>
             <div class="big-stat-label">severity &middot; ${r.confidence}% confident</div>
           </div>
