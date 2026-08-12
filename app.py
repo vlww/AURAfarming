@@ -109,12 +109,6 @@ def _box_ios(a, b):
 
 
 def _center_distance_ratio(a, b):
-    """Distance between box centers, normalized by the boxes' average
-    diagonal. Near 0 means the two boxes are centered on essentially the
-    same point (the signature of a duplicate detection); closer to 1+
-    means the boxes are offset by roughly a body-length or more, which is
-    what two adjacent-but-distinct insects look like even when their edges
-    overlap."""
     ax1, ay1, ax2, ay2 = a
     bx1, by1, bx2, by2 = b
     acx, acy = (ax1 + ax2) / 2, (ay1 + ay2) / 2
@@ -127,17 +121,6 @@ def _center_distance_ratio(a, b):
 
 
 def _dedupe_detections(detections, iou_thresh=0.7, ios_thresh=0.88, center_dist_thresh=0.3):
-    """Class-agnostic duplicate merge, applied on top of SAHI's own
-    tile-boundary merge as a safety net.
-
-    Deliberately strict: only merges boxes that are both heavily
-    overlapping AND centered on essentially the same point. That combo is
-    what a duplicate detection of one bug looks like (same instance, box
-    jittered a few pixels by model noise). Two distinct bugs -- even
-    sitting close together -- almost never hit both conditions at once, so
-    this errs toward keeping separate detections separate rather than
-    merging borderline cases.
-    """
     ordered = sorted(detections, key=lambda d: d["confidence"], reverse=True)
     kept = []
     kept_boxes = []
@@ -208,10 +191,6 @@ def detect_pests(image_bgr):
     detections = _dedupe_detections(raw_detections)
     if len(raw_detections) != len(detections):
         print(f"[pest debug] deduped {len(raw_detections)} raw boxes down to {len(detections)}")
-    # Full raw-box dump -- if two boxes here have near-zero overlap and still
-    # end up merged, the merge isn't happening in _dedupe_detections (it
-    # mathematically can't on non-overlapping boxes); look at whether SAHI
-    # only ever returned one raw box for the region instead of two.
     for i, d in enumerate(raw_detections):
         print(f"[pest debug]   raw[{i}] {d['species']} conf={d['confidence']} "
               f"box=({d['x']},{d['y']},{d['x']+d['w']},{d['y']+d['h']})")

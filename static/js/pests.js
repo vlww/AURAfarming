@@ -52,7 +52,7 @@
       .join('');
 
     const message = r.risk === 'Low'
-      ? 'Low pest activity — keep an eye on things during your regular walk-through.'
+      ? 'Low pest activity. Keep an eye on things during your regular walk-through.'
       : r.risk === 'Moderate'
       ? 'Some pest activity found. Check nearby plants and consider targeted treatment.'
       : 'High pest activity detected. Inspect the area closely and treat promptly to protect your crop.';
@@ -77,7 +77,7 @@
             <span class="stat-label">Scanned at</span>
             <span class="stat-value">${r.time}</span>
           </div>
-          <div class="recommend-box"><span>🌿</span><span>${message}</span></div>
+          <div class="recommend-box"><span>${message}</span></div>
         </div>
       </div>
     `;

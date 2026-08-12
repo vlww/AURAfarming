@@ -65,7 +65,7 @@
             <span class="stat-label">Scanned at</span>
             <span class="stat-value">${r.time}</span>
           </div>
-          <div class="recommend-box"><span>🌱</span><span>${r.recommendation}</span></div>
+          <div class="recommend-box"><span>${r.recommendation}</span></div>
           ${others ? `<div style="margin-top:16px;"><div class="stat-label" style="margin-bottom:8px;">Other possibilities</div><div class="species-list">${others}</div></div>` : ''}
         </div>
       </div>
