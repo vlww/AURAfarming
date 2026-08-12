@@ -126,23 +126,17 @@ def _center_distance_ratio(a, b):
     return dist / avg_diag if avg_diag > 0 else 0.0
 
 
-def _dedupe_detections(detections, iou_thresh=0.5, ios_thresh=0.75, center_dist_thresh=0.45):
+def _dedupe_detections(detections, iou_thresh=0.7, ios_thresh=0.88, center_dist_thresh=0.3):
     """Class-agnostic duplicate merge, applied on top of SAHI's own
     tile-boundary merge as a safety net.
 
-    Two conditions both have to hold for two boxes to be treated as the
-    same physical bug:
-      1. Strong area overlap (IoU or IoS above threshold), AND
-      2. Their centers are close together relative to their size.
-
-    Overlap alone isn't enough -- two distinct bugs sitting right next to
-    each other (an aphid colony is the common case) can have boxes that
-    overlap by quite a lot without being the same insect. What actually
-    distinguishes "duplicate box for one bug" from "two adjacent bugs" is
-    that duplicates are essentially centered on the same point, while two
-    real neighbors are offset by roughly a body-width even if their edges
-    touch or overlap. Requiring both keeps real duplicates merging while
-    letting distinct, touching insects each keep their own count.
+    Deliberately strict: only merges boxes that are both heavily
+    overlapping AND centered on essentially the same point. That combo is
+    what a duplicate detection of one bug looks like (same instance, box
+    jittered a few pixels by model noise). Two distinct bugs -- even
+    sitting close together -- almost never hit both conditions at once, so
+    this errs toward keeping separate detections separate rather than
+    merging borderline cases.
     """
     ordered = sorted(detections, key=lambda d: d["confidence"], reverse=True)
     kept = []
@@ -183,7 +177,7 @@ def detect_pests(image_bgr):
         overlap_width_ratio=SLICE_OVERLAP,
         postprocess_type="GREEDYNMM",
         postprocess_match_metric="IOS",
-        postprocess_match_threshold=0.55,
+        postprocess_match_threshold=0.8,
         postprocess_class_agnostic=True,
         verbose=0,
     )
@@ -214,6 +208,13 @@ def detect_pests(image_bgr):
     detections = _dedupe_detections(raw_detections)
     if len(raw_detections) != len(detections):
         print(f"[pest debug] deduped {len(raw_detections)} raw boxes down to {len(detections)}")
+    # Full raw-box dump -- if two boxes here have near-zero overlap and still
+    # end up merged, the merge isn't happening in _dedupe_detections (it
+    # mathematically can't on non-overlapping boxes); look at whether SAHI
+    # only ever returned one raw box for the region instead of two.
+    for i, d in enumerate(raw_detections):
+        print(f"[pest debug]   raw[{i}] {d['species']} conf={d['confidence']} "
+              f"box=({d['x']},{d['y']},{d['x']+d['w']},{d['y']+d['h']})")
 
     annotated = image_bgr.copy()
     for d in detections:
