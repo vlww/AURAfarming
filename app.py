@@ -70,7 +70,6 @@ def _next_soil_reading():
 
 
 def _soil_score(reading):
-    """Very simple composite health score from the current readings."""
     moisture_score = 100 - abs(reading["moisture"] - 55) * 1.4
     salinity_score = 100 - max(0, reading["salinity"] - 1.2) * 35
     ph_score = 100 - abs(reading["ph"] - 6.5) * 22
@@ -79,19 +78,56 @@ def _soil_score(reading):
     return max(0, min(100, round(score)))
 
 
-# seed a bit of history so the dashboard isn't empty on first load
 for _ in range(20):
     _next_soil_reading()
 
 
+def _box_iou(a, b):
+    ax1, ay1, ax2, ay2 = a
+    bx1, by1, bx2, by2 = b
+    ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+    iw, ih = max(0, ix2 - ix1), max(0, iy2 - iy1)
+    inter = iw * ih
+    area_a = max(0, ax2 - ax1) * max(0, ay2 - ay1)
+    area_b = max(0, bx2 - bx1) * max(0, by2 - by1)
+    union = area_a + area_b - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _box_ios(a, b):
+    ax1, ay1, ax2, ay2 = a
+    bx1, by1, bx2, by2 = b
+    ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+    iw, ih = max(0, ix2 - ix1), max(0, iy2 - iy1)
+    inter = iw * ih
+    area_a = max(0, ax2 - ax1) * max(0, ay2 - ay1)
+    area_b = max(0, bx2 - bx1) * max(0, by2 - by1)
+    smaller = min(area_a, area_b)
+    return inter / smaller if smaller > 0 else 0.0
+
+
+def _dedupe_detections(detections, iou_thresh=0.35, ios_thresh=0.6):
+    ordered = sorted(detections, key=lambda d: d["confidence"], reverse=True)
+    kept = []
+    kept_boxes = []
+    for d in ordered:
+        box = (d["x"], d["y"], d["x"] + d["w"], d["y"] + d["h"])
+        is_dup = any(
+            _box_iou(box, kb) > iou_thresh or _box_ios(box, kb) > ios_thresh
+            for kb in kept_boxes
+        )
+        if not is_dup:
+            kept.append(d)
+            kept_boxes.append(box)
+    return kept
+
+
 def detect_pests(image_bgr):
-    """Real pest detection using a YOLO11 model fine-tuned on IP102 (102 pest
-    species). See pest_model.py for where the weights come from."""
     h, w = image_bgr.shape[:2]
     img_area = h * w
 
-    # Upscale small photos so tiny/clustered pests have more pixels to work
-    # with -- a 400px-wide photo shrinks aphids to near-nothing once tiled.
     work_img = image_bgr
     scale = 1.0
     max_dim = max(h, w)
@@ -103,12 +139,16 @@ def detect_pests(image_bgr):
     from sahi.predict import get_sliced_prediction
 
     sliced = get_sliced_prediction(
-        work_img[:, :, ::-1],  # SAHI expects RGB, we have BGR from cv2
+        work_img[:, :, ::-1], 
         sahi_model,
         slice_height=SLICE_SIZE,
         slice_width=SLICE_SIZE,
         overlap_height_ratio=SLICE_OVERLAP,
         overlap_width_ratio=SLICE_OVERLAP,
+        postprocess_type="GREEDYNMM",
+        postprocess_match_metric="IOS",
+        postprocess_match_threshold=0.4,
+        postprocess_class_agnostic=True,
         verbose=0,
     )
 
@@ -117,8 +157,7 @@ def detect_pests(image_bgr):
           f"top confidences: {[round(c, 2) for c in all_confidences[:8]]}, "
           f"threshold in use: {CONF_THRESHOLD}, upscale factor: {round(scale, 2)}")
 
-    detections = []
-    annotated = image_bgr.copy()
+    raw_detections = []
 
     for pred in sliced.object_prediction_list:
         conf_val = pred.score.value
@@ -132,10 +171,18 @@ def detect_pests(image_bgr):
         x1, y1 = max(0, x1), max(0, y1)
         bw, bh = x2 - x1, y2 - y1
 
-        detections.append({
+        raw_detections.append({
             "species": species, "x": x1, "y": y1, "w": bw, "h": bh, "confidence": confidence,
         })
 
+    detections = _dedupe_detections(raw_detections)
+    if len(raw_detections) != len(detections):
+        print(f"[pest debug] deduped {len(raw_detections)} raw boxes down to {len(detections)}")
+
+    annotated = image_bgr.copy()
+    for d in detections:
+        x1, y1, x2, y2 = d["x"], d["y"], d["x"] + d["w"], d["y"] + d["h"]
+        species, confidence = d["species"], d["confidence"]
         cv2.rectangle(annotated, (x1, y1), (x2, y2), _PEST_BOX_COLOR, 2)
         label = f"{species} {confidence:.0f}%"
         (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
@@ -150,8 +197,6 @@ def detect_pests(image_bgr):
     total = len(detections)
     risk = "Low" if total <= 1 else "Moderate" if total <= 4 else "High"
 
-    # Rough foliage-coverage estimate kept as supplementary context (not a
-    # detection signal anymore -- the model above handles that).
     hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
     green_mask = cv2.inRange(hsv, (25, 30, 30), (95, 255, 255))
     leaf_pct = round(100 * cv2.countNonZero(green_mask) / img_area, 1)
@@ -166,11 +211,6 @@ def detect_pests(image_bgr):
 
 
 def _foreground_mask(image_bgr):
-    """Rough foreground/background separation via GrabCut, so the color
-    heuristic below only looks for spots on the plant itself and ignores
-    background clutter. Assumes the subject is roughly centered, which
-    holds for typical close-up leaf photos.
-    """
     h, w = image_bgr.shape[:2]
     mask = np.zeros((h, w), np.uint8)
     bgd_model = np.zeros((1, 65), np.float64)
@@ -223,6 +263,8 @@ def detect_disease(image_bgr):
     non_green = cv2.morphologyEx(non_green, cv2.MORPH_OPEN, kernel, iterations=1)
     non_green = cv2.morphologyEx(non_green, cv2.MORPH_CLOSE, kernel, iterations=2)
 
+    # Dark spots can fall outside fg_mask, so widen the leaf-area
+    # denominator to match, or affected_pct could read over 100%.
     leaf_mask = cv2.bitwise_or(fg_mask, dark_mask)
     leaf_px = cv2.countNonZero(leaf_mask)
     disease_px = cv2.countNonZero(non_green)
