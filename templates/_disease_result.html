@@ -3,7 +3,7 @@
     <img src="{{ result.overlay_image }}" alt="Photo with affected areas highlighted">
   </div>
   <div class="card">
-    <div class="diagnosis-headline {{ 'concern' if result.severity != 'None' else 'clear' }}">{{ result.diagnosis }}</div>
+    <div class="diagnosis-headline {{ 'concern' if result.severity != 'None' else 'clear' }}">Diagnosis: {{ result.diagnosis }}</div>
     <div class="diagnosis-subline">{{ result.severity }} <span class="sep">|</span> {{ result.confidence }}% Confident</div>
 
     <div class="stat-line" style="margin-top:14px;">
@@ -16,7 +16,6 @@
     </div>
 
     <div class="recommend-box">
-      <span>🌱</span>
       <span>{{ result.recommendation }}</span>
     </div>
 
