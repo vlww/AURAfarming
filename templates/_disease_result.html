@@ -9,12 +9,11 @@
       <div class="big-stat-label">severity &middot; {{ result.confidence }}% confident</div>
     </div>
 
-    {% if result.crop %}
-    <div class="stat-line" style="margin-top:10px;">
-      <span class="stat-label">Crop</span>
-      <span class="stat-value">{{ result.crop }}</span>
+    <div class="diagnosis-highlight {{ 'concern' if result.severity != 'None' else 'clear' }}">
+      <span class="diagnosis-label">Diagnosis</span>
+      <span class="diagnosis-value">{{ result.diagnosis }}</span>
     </div>
-    {% endif %}
+
     <div class="stat-line">
       <span class="stat-label">Leaf area affected</span>
       <span class="stat-value">{{ result.affected_pct }}%</span>
@@ -25,7 +24,6 @@
     </div>
 
     <div class="recommend-box">
-      <span>🌱</span>
       <span>{{ result.recommendation }}</span>
     </div>
 

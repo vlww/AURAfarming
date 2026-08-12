@@ -62,7 +62,10 @@
             <div class="big-stat">${r.severity}</div>
             <div class="big-stat-label">severity &middot; ${r.confidence}% confident</div>
           </div>
-          ${r.crop ? `<div class="stat-line" style="margin-top:10px;"><span class="stat-label">Crop</span><span class="stat-value">${r.crop}</span></div>` : ''}
+          <div class="diagnosis-highlight ${r.severity !== 'None' ? 'concern' : 'clear'}">
+            <span class="diagnosis-label">Diagnosis</span>
+            <span class="diagnosis-value">${r.diagnosis}</span>
+          </div>
           <div class="stat-line">
             <span class="stat-label">Leaf area affected</span>
             <span class="stat-value">${r.affected_pct}%</span>

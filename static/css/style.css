@@ -1,7 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Mulish:wght@400;500;600;700&display=swap');
 
 :root {
-  /* color */
   --bg: #E8F2E1;
   --bg-alt: #F4FAF0;
   --surface: #FFFFFF;
@@ -280,6 +279,33 @@ button, input, select { font-family: inherit; }
 .badge.moderate, .badge.minor { background: var(--amber-100); color: #96660E; }
 .badge.high, .badge.severe { background: var(--rust-100); color: var(--rust-500); }
 
+.diagnosis-highlight {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-leaf-sm);
+  margin: 14px 0 4px;
+}
+
+.diagnosis-highlight .diagnosis-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.diagnosis-highlight .diagnosis-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+
+.diagnosis-highlight.concern { background: var(--rust-100); color: var(--rust-500); }
+.diagnosis-highlight.clear { background: var(--leaf-good-bg); color: var(--leaf-good); }
+
 .badge-dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: currentColor;
@@ -539,6 +565,7 @@ button, input, select { font-family: inherit; }
 }
 
 /* mobile shi */
+
 @media (max-width: 760px) {
   .app-shell { flex-direction: column; }
   .sidebar {
