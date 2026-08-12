@@ -108,14 +108,50 @@ def _box_ios(a, b):
     return inter / smaller if smaller > 0 else 0.0
 
 
-def _dedupe_detections(detections, iou_thresh=0.35, ios_thresh=0.6):
+def _center_distance_ratio(a, b):
+    """Distance between box centers, normalized by the boxes' average
+    diagonal. Near 0 means the two boxes are centered on essentially the
+    same point (the signature of a duplicate detection); closer to 1+
+    means the boxes are offset by roughly a body-length or more, which is
+    what two adjacent-but-distinct insects look like even when their edges
+    overlap."""
+    ax1, ay1, ax2, ay2 = a
+    bx1, by1, bx2, by2 = b
+    acx, acy = (ax1 + ax2) / 2, (ay1 + ay2) / 2
+    bcx, bcy = (bx1 + bx2) / 2, (by1 + by2) / 2
+    dist = ((acx - bcx) ** 2 + (acy - bcy) ** 2) ** 0.5
+    diag_a = ((ax2 - ax1) ** 2 + (ay2 - ay1) ** 2) ** 0.5
+    diag_b = ((bx2 - bx1) ** 2 + (by2 - by1) ** 2) ** 0.5
+    avg_diag = (diag_a + diag_b) / 2
+    return dist / avg_diag if avg_diag > 0 else 0.0
+
+
+def _dedupe_detections(detections, iou_thresh=0.5, ios_thresh=0.75, center_dist_thresh=0.45):
+    """Class-agnostic duplicate merge, applied on top of SAHI's own
+    tile-boundary merge as a safety net.
+
+    Two conditions both have to hold for two boxes to be treated as the
+    same physical bug:
+      1. Strong area overlap (IoU or IoS above threshold), AND
+      2. Their centers are close together relative to their size.
+
+    Overlap alone isn't enough -- two distinct bugs sitting right next to
+    each other (an aphid colony is the common case) can have boxes that
+    overlap by quite a lot without being the same insect. What actually
+    distinguishes "duplicate box for one bug" from "two adjacent bugs" is
+    that duplicates are essentially centered on the same point, while two
+    real neighbors are offset by roughly a body-width even if their edges
+    touch or overlap. Requiring both keeps real duplicates merging while
+    letting distinct, touching insects each keep their own count.
+    """
     ordered = sorted(detections, key=lambda d: d["confidence"], reverse=True)
     kept = []
     kept_boxes = []
     for d in ordered:
         box = (d["x"], d["y"], d["x"] + d["w"], d["y"] + d["h"])
         is_dup = any(
-            _box_iou(box, kb) > iou_thresh or _box_ios(box, kb) > ios_thresh
+            (_box_iou(box, kb) > iou_thresh or _box_ios(box, kb) > ios_thresh)
+            and _center_distance_ratio(box, kb) < center_dist_thresh
             for kb in kept_boxes
         )
         if not is_dup:
@@ -147,7 +183,7 @@ def detect_pests(image_bgr):
         overlap_width_ratio=SLICE_OVERLAP,
         postprocess_type="GREEDYNMM",
         postprocess_match_metric="IOS",
-        postprocess_match_threshold=0.4,
+        postprocess_match_threshold=0.55,
         postprocess_class_agnostic=True,
         verbose=0,
     )
