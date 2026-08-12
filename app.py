@@ -7,10 +7,11 @@ from datetime import datetime
 
 import cv2
 import numpy as np
-from flask import Flask, render_template, request, jsonify, url_for
+from flask import Flask, render_template, request, jsonify, url_for, Response
 
 from pest_model import get_sahi_model, CONF_THRESHOLD, SLICE_SIZE, SLICE_OVERLAP, warm_up as pest_warm_up
 from disease_model import predict as disease_predict, parse_disease_label, warm_up as disease_warm_up
+from report import build_report_pdf
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
@@ -165,6 +166,11 @@ def detect_pests(image_bgr):
 
 
 def _foreground_mask(image_bgr):
+    """Rough foreground/background separation via GrabCut, so the color
+    heuristic below only looks for spots on the plant itself and ignores
+    background clutter. Assumes the subject is roughly centered, which
+    holds for typical close-up leaf photos.
+    """
     h, w = image_bgr.shape[:2]
     mask = np.zeros((h, w), np.uint8)
     bgd_model = np.zeros((1, 65), np.float64)
@@ -371,6 +377,24 @@ def api_soil_latest():
 @app.route("/api/soil/history")
 def api_soil_history():
     return jsonify(STATE["soil_history"])
+
+
+@app.route("/export/pdf")
+def export_pdf():
+    latest_soil = STATE["soil_history"][-1] if STATE["soil_history"] else None
+    soil_score = _soil_score(latest_soil) if latest_soil else None
+    pdf_bytes = build_report_pdf(
+        pest=STATE["last_pest"],
+        disease=STATE["last_disease"],
+        soil=latest_soil,
+        soil_score=soil_score,
+    )
+    filename = f"aurafarming_report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 if __name__ == "__main__":
