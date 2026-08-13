@@ -24,9 +24,9 @@ _PEST_BOX_COLOR = (66, 133, 244)  # BGR
 
 
 STATE = {
-    "last_pest": None,      # {"species_counts": {...}, "total": int, "risk": str, "time": str, "image": str}
-    "last_disease": None,   # {"diagnosis": str, "affected_pct": float, "severity": str, "time": str, "image": str}
-    "soil_history": [],     # list of dicts, most recent last
+    "last_pest": None,   
+    "last_disease": None, 
+    "soil_history": [],   
 }
 
 
@@ -36,9 +36,9 @@ def _now():
 
 _soil_baseline = {
     "moisture": 42.0,     # %
-    "salinity": 1.1,      # dS/m (electrical conductivity)
+    "salinity": 1.1,      # dS/m 
     "ph": 6.5,
-    "nitrogen": 60.0,     # ppm (relative index)
+    "nitrogen": 60.0,     # ppm 
     "temperature": 23.0,  # C
 }
 
@@ -251,7 +251,7 @@ def detect_disease(image_bgr):
     rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     pil_img = Image.fromarray(rgb)
 
-    predictions = disease_predict(pil_img, top_k=3)  # sorted list of {"label", "score"}
+    predictions = disease_predict(pil_img, top_k=3)  
 
     top = predictions[0]
     crop, condition, is_healthy = parse_disease_label(top["label"])
@@ -270,7 +270,7 @@ def detect_disease(image_bgr):
 
     hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
     green_mask = cv2.inRange(hsv, (30, 40, 40), (95, 255, 255))
-    dark_mask = cv2.inRange(hsv, (0, 0, 0), (180, 255, 40))  # near-black, any hue/saturation
+    dark_mask = cv2.inRange(hsv, (0, 0, 0), (180, 255, 40))  
 
     non_green = cv2.bitwise_and(fg_mask, cv2.bitwise_not(green_mask))
     non_green = cv2.bitwise_or(non_green, dark_mask)
@@ -279,8 +279,6 @@ def detect_disease(image_bgr):
     non_green = cv2.morphologyEx(non_green, cv2.MORPH_OPEN, kernel, iterations=1)
     non_green = cv2.morphologyEx(non_green, cv2.MORPH_CLOSE, kernel, iterations=2)
 
-    # Dark spots can fall outside fg_mask, so widen the leaf-area
-    # denominator to match, or affected_pct could read over 100%.
     leaf_mask = cv2.bitwise_or(fg_mask, dark_mask)
     leaf_px = cv2.countNonZero(leaf_mask)
     disease_px = cv2.countNonZero(non_green)
@@ -290,7 +288,7 @@ def detect_disease(image_bgr):
     contours = []
     if not is_healthy:
         red_layer = np.zeros_like(image_bgr)
-        red_layer[:, :] = (40, 40, 235)  # BGR red-ish
+        red_layer[:, :] = (40, 40, 235) 
         mask_bool = non_green.astype(bool)
         overlay[mask_bool] = cv2.addWeighted(image_bgr, 0.45, red_layer, 0.55, 0)[mask_bool]
 
@@ -298,7 +296,7 @@ def detect_disease(image_bgr):
         contours = [c for c in contours if cv2.contourArea(c) > (h * w) * 0.0008]
         cv2.drawContours(overlay, contours, -1, (40, 40, 235), 2)
     else:
-        affected_pct = 0.0  # trust the real classifier's healthy call over the color heuristic
+        affected_pct = 0.0  
 
     if is_healthy:
         severity = "None"
