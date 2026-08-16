@@ -2,8 +2,8 @@
 
 Demo of a smart farming dashboard computer vision models to detect crop pests, disease, and soil health. Runs locally from the terminal
 
-[![Pitch Presentation](https://www.youtube.com/watch?v=bJGNi01e4lU)](https://www.youtube.com/watch?v=bJGNi01e4lU)
-[!Project Plan](https://drive.google.com/file/d/1OC4DmfbKcseiF5CU-5XvMRemJ9M-VzKU/view?usp=sharing)
+[![Pitch Presentation](https://shields.io)](https://www.youtube.com/watch?v=bJGNi01e4lU)<br>
+[Project Plan](https://drive.google.com/file/d/1OC4DmfbKcseiF5CU-5XvMRemJ9M-VzKU/view?usp=sharing)
 
 ## Setup
 First, cd into the aurafarming/ folder
